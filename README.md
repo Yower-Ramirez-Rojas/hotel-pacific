@@ -1,1 +1,1 @@
-"# Sistema de Reservas - Hotel Pac¡fico" 
+"# Sistema de Reservas - Hotel Pacific" 
