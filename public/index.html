@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema Hotel Pacífico</title>
+    <link rel="stylesheet" href="style.css?v=3"> 
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <img src="/img/logo.png" alt="Logo Hotel Pacific" class="logo-symbol">
+            <h1 class="hotel-title">Hotel Pacific</h1>
+        </div>
+    </header>
+
+    <main>
+        <section id="datos-cliente" style="background: #f9f9f9; padding: 20px; margin-bottom: 20px; border-radius: 8px;">
+            <h2>Tus Datos Personales</h2>
+            <p>Por favor, completa tus datos antes de seleccionar una habitación.</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div>
+                    <label for="nombre">Nombre:</label><br>
+                    <input type="text" id="nombre" name="nombre" required placeholder="Ej: Juan" style="width: 100%; padding: 8px;">
+                </div>
+                <div>
+                    <label for="apellido">Apellido:</label><br>
+                    <input type="text" id="apellido" name="apellido" required placeholder="Ej: Pérez" style="width: 100%; padding: 8px;">
+                </div>
+                <div>
+                    <label for="rut">RUT:</label><br>
+                    <input type="text" id="rut" name="rut" required placeholder="Ej: 12345678-9" style="width: 100%; padding: 8px;">
+                </div>
+                <div>
+                    <label for="telefono">Teléfono:</label><br>
+                    <input type="tel" id="telefono" name="telefono" required placeholder="Ej: +56912345678" style="width: 100%; padding: 8px;">
+                </div>
+                <div style="grid-column: span 2;">
+                    <label for="fecha_ingreso">Fecha de Ingreso:</label><br>
+                    <input type="date" id="fecha_ingreso" name="fecha_ingreso" required style="width: 100%; padding: 8px;">
+                </div>
+            </div>
+        </section>
+
+        <section id="habitaciones-list">
+            <h2>Habitaciones Disponibles</h2>
+            <div id="lista-container">
+                <p>Cargando disponibilidad...</p>
+            </div>
+        </section>
+    </main>
+
+   <script>
+        function cargarHabitaciones() {
+            fetch('/api/habitaciones')
+                .then(res => res.json())
+                .then(data => {
+                    const container = document.getElementById('lista-container');
+                    
+                    const grupos = data.reduce((acumulador, hab) => {
+                        if (!acumulador[hab.tipo]) acumulador[hab.tipo] = [];
+                        acumulador[hab.tipo].push(hab);
+                        return acumulador;
+                    }, {});
+
+                    let htmlFinal = '';
+
+                    for (const tipo in grupos) {
+                        const todasDelTipo = grupos[tipo];
+                        const disponibles = todasDelTipo.filter(h => h.disponible === 1);
+                        const cantidadLibres = disponibles.length;
+                        const nombreImagen = tipo.toLowerCase();
+
+                        let opcionesSelect = disponibles.map(h => 
+                            `<option value="${h.numero}">Habitación ${h.numero}</option>`
+                        ).join('');
+
+                        // Dibujamos la tarjeta
+                        htmlFinal += `
+                        <div class="habitacion">
+                            <img src="/img/${nombreImagen}.png" alt="${tipo}" onerror="this.onerror=null; this.src='/img/default.jpg';">
+                            <div class="info-content">
+                                <h3>Habitación ${tipo}</h3>
+                                <p>Disponibles: <strong>${cantidadLibres}</strong></p>
+                                
+                                ${cantidadLibres > 0 
+                                    ? `
+                                    <select id="select-${tipo}" class="room-selector">
+                                        <option value="" disabled selected>Elige un número...</option>
+                                        ${opcionesSelect}
+                                    </select>
+                                    
+                                    <select id="pago-${tipo}" class="room-selector">
+                                        <option value="tarjeta" selected>Pago con Tarjeta</option>
+                                        <option value="efectivo">Pago en Efectivo</option>
+                                        <option value="paypal">PayPal</option>
+                                    </select>
+                                    
+                                    <button onclick="reservarDesdeSelect('${tipo}')">Reservar Ahora</button>
+                                    ` 
+                                    : `<button disabled>Agotado</button>`
+                                }
+                            </div>
+                        </div>
+                        `;
+                    }
+                    
+                    container.innerHTML = htmlFinal;
+                });
+        }
+
+        function reservarDesdeSelect(tipo) {
+            const nombre = document.getElementById('nombre').value;
+            const apellido = document.getElementById('apellido').value;
+            const rut = document.getElementById('rut').value;
+            const telefono = document.getElementById('telefono').value;
+            const fecha_ingreso = document.getElementById('fecha_ingreso').value;
+
+            if(!nombre || !apellido || !rut || !telefono || !fecha_ingreso){
+                alert("Por favor, completa todos tus datos personales arriba antes de reservar.");
+                return;
+            }
+
+            const selectElement = document.getElementById(`select-${tipo}`);
+            const numeroElegido = selectElement.value;
+            
+
+            const selectPago = document.getElementById(`pago-${tipo}`);
+            const metodoPago = selectPago.value;
+
+            if (!numeroElegido) {
+                alert("⚠️ Por favor, selecciona un número de habitación primero.");
+                return;
+            }
+
+            ejecutarReservaEnServidor(numeroElegido, metodoPago, nombre, apellido, rut, telefono, fecha_ingreso);
+        }
+
+        function ejecutarReservaEnServidor(numero, metodoPago, nombre, apellido, rut, telefono, fecha_ingreso) {
+            let nombrePago = 'Efectivo';
+            if (metodoPago === 'tarjeta') nombrePago = 'Tarjeta de Crédito';
+            if (metodoPago === 'paypal') nombrePago = 'PayPal';
+            
+            if(confirm(`Hola ${nombre}, ¿Estás seguro que deseas reservar la habitación ${numero} para el ${fecha_ingreso} pagando con ${nombrePago}?`)) {
+                
+        
+                const paqueteDatos = {
+                    numero: numero,
+                    pago: metodoPago,
+                    nombre: nombre,
+                    apellido: apellido,
+                    rut: rut,
+                    telefono: telefono,
+                    fecha_ingreso: fecha_ingreso
+                };
+
+                fetch('/api/reservar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(paqueteDatos)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if(data.success) {
+                        alert(" ¡Reserva exitosa! " + data.mensaje); 
+                        
+                        document.getElementById('nombre').value = '';
+                        document.getElementById('apellido').value = '';
+                        document.getElementById('rut').value = '';
+                        document.getElementById('telefono').value = '';
+                        document.getElementById('fecha_ingreso').value = '';
+                        
+                        cargarHabitaciones(); 
+                    } else {
+                        alert(" Error: " + data.error);
+                    }
+                });
+            }
+        }
+
+        // Iniciar
+        cargarHabitaciones();
+    </script>
+</body>
+</html>
